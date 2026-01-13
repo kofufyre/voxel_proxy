@@ -1,0 +1,227 @@
+/*
+    Voxel Proxy Utility functions.
+*/
+
+
+global proc int voxelProxy_settingsFile_exists() {
+
+    string $appdata = `getenv "APPDATA"`;
+    string $voxel_folder = $appdata + "/voxel_proxy";
+
+    if (!`filetest -d $voxel_folder`) {
+        return 0;
+    }
+
+    if (!`filetest -d $voxel_folder`) {
+
+        if (!`filetest -e ($voxel_folder + "/meshlabserver.ini")`) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
+global proc int voxelProxy_meshLabServer_write_path(string $path) {
+
+    string $appdata = `getenv "APPDATA"`;
+    string $voxel_folder = $appdata + "/voxel_proxy";
+    string $ini_file = $voxel_folder + "/meshlabserver.ini";
+
+    if (!`filetest -d $voxel_folder`) {
+
+        if (catchQuiet(`sysFile -md $voxel_folder`)) {
+            trace "Voxel Proxy -> Failed to make voxel_proxy directory in appdata.";
+        }
+    }
+
+    if (`filetest -f $ini_file`) {
+
+        if (catchQuiet(`sysFile -del $ini_file`)) {
+            trace "Voxel Proxy -> Failed to re-write meshlabserver .ini file.";
+        }
+    }
+
+    int $fstream = `fopen $ini_file "w"`;
+
+    if (!$fstream) {
+        trace "Voxel Proxy -> Failed to open stream on writing meshlabserver ini file.";
+        return 0;
+    }
+
+
+    fprint $fstream $path;
+
+    fclose $fstream;
+
+    return 1;
+}
+
+
+
+global proc voxelProxy_textField_setPath() {
+    // update textField in UI from user file dialog
+    string $path[] = `fileDialog2 -fileMode 1 -caption "Find meshlabserver.exe" -fileFilter "*.exe"`;
+
+    if (size($path) != 0) {
+        textField -e -tx $path[0] meshLabServerPath_field;
+    }
+}
+
+
+global proc voxelProxy_meshLabServer_save() {
+    // UI related, runs on "Save" button press; writing path to meshlabserver.exe
+    string $path = `textField -q -tx meshLabServerPath_field`;
+
+    if (size($path) != 0) {
+        voxelProxy_meshLabServer_write_path("\"" + $path + "\"");
+    }
+
+    if (basename($path, "") == "meshlabserver.exe") {
+
+        text -e -vis off voxelProxy_meshLab_missingHint;
+        image -e -vis off voxelProxy_meshLab_missingHintIcon;
+
+        intSliderGrp -e -vis on voxelProxy_meshLab_meshPolygons;
+        checkBox -e -vis on voxelProxy_meshLab_singleShell;
+        image -e -vis on voxelProxy_meshLab_muteIcon;
+
+        columnLayout -e -vis on mlab_supressBG;
+        columnLayout -e -vis on mlab_supressBG2;
+
+        checkBox -e -vis on voxelProxy_meshLab_skip;
+        
+    }   
+}
+
+
+global proc string voxelProxy_meshLabServer_get_UI() {
+    // return path to meshlabserver from textfield in UI
+
+    string $path = `textField -q -tx meshLabServerPath_field`;
+
+    if (size($path) != 0) {
+        return $path;
+
+    } else {
+        return "";
+    }
+}
+
+
+global proc string voxelProxy_meshLabServer_get_appdata() {
+    // return path to meshlabserver from ini file in appdata
+
+    string $appdata = `getenv "APPDATA"`;
+    string $voxel_folder = $appdata + "/voxel_proxy";
+    string $ini_file = $voxel_folder + "/meshlabserver.ini";
+
+    if (!voxelProxy_settingsFile_exists()) {
+        return "";
+    }
+
+
+    int $fstream = `fopen $ini_file "r"`;
+    string $line = `fgetline $fstream`;
+
+    fclose $fstream;
+
+    string $path = substituteAllString($line, "\"", "");
+
+    return $path;
+}
+
+
+
+// export mesh to obj file
+global proc int voxelProxy_exportOBJ(string $mesh, string $path) {
+    
+    if (!`objExists $mesh`) {
+        trace ("voxelProxy_exportOBJ -> Failed to find mesh for export: " + $mesh);
+        return 0;
+    }
+
+    if (!`filetest -d $path`) {
+        trace ("voxelProxy_exportOBJ -> Failed to find directory: " + $path);
+        return 0;
+    }
+
+
+    select -cl;
+    select $mesh;
+
+    file -force 
+    -options "groups=1;ptgroups=0;materials=0;smoothing=1;normals=1" 
+    -typ "OBJexport" 
+    -es ($path + "/" + $mesh + ".obj");
+
+    return 1;
+}
+
+
+// import obj file to scene
+global proc int voxelProxy_importOBJ(string $filepath, string $obj_name) {
+
+    if (!`filetest -f $filepath`) {
+        trace ("voxelProxy_importOBJ -> Failed to find .OBJ at: " + $filepath);
+        return 0;
+    }
+
+
+    string $objs[] = `file  -import -type "OBJ" 
+                            -ra true 
+                            -options "mo=1" 
+                            -rnn 
+                            $filepath`;
+
+
+
+    if (size($objs) != 0) {
+
+        for ($o in $objs) {
+
+            if (!`objExists $o`) {
+                continue;
+            }
+
+            rename $o $obj_name;
+        }
+    }
+
+
+    return 1;
+}
+
+
+// creates special material for proxy mesh
+global proc int voxelProxy_set_material(string $mesh) {
+
+    if (`objExists "lambert_voxelProxy"`) {
+
+        string $sg[] = `listConnections -d on -s off "lambert_voxelProxy.outColor"`;
+
+        if (size($sg) == 0) {
+            return 0;
+        }
+
+        catchQuiet(`sets -e -fe $sg[0] $mesh`);
+        setAttr "lambert_voxelProxy.color" -type double3 0.3898 0.5272 0.7101;
+
+        return 1;
+
+    } else {
+
+        string $lambert = `shadingNode -as "lambert" -n "lambert_voxelProxy"`;
+        string $sg_new = `sets -r on -nss on -em -n ($lambert + "SG")`;
+        connectAttr -f ($lambert + ".outColor") ($sg_new + ".surfaceShader");
+
+
+        catchQuiet(`sets -e -fe $sg_new $mesh`);
+        setAttr "lambert_voxelProxy.color" -type double3 0.3898 0.5272 0.7101;
+
+        return 1;
+    }
+
+    return 1;
+}

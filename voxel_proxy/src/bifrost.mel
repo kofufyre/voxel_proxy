@@ -1,0 +1,74 @@
+
+
+global proc string voxelProxy_contour_mesh(string $mesh, float $offset, float $fog_density, float $detail_size) {
+    // return voxelized poly mesh 
+
+    if (!`objExists $mesh`) {
+        return "";
+    }
+
+    string $mesh_shape[] = `listRelatives -c -s -typ "mesh" $mesh`;
+
+    if (size($mesh_shape) == 0) {
+        return "";
+    }
+
+    string $mesh_path[] = `ls -l $mesh_shape[0]`;
+    string $mesh_bifrost_path = substituteAllString($mesh_path[0], "|", "/") + ";";
+
+    string $bifrost_shape = `createNode "bifrostGraphShape" -ss`;
+    string $bifrost_graph[] = `listRelatives -p $bifrost_shape`;
+    
+ 
+    string $io_node[] = `vnnCompound ($bifrost_graph[0] + "|" + $bifrost_shape) "/" -addIONode true`;
+    string $input[] = `vnnCompound ($bifrost_graph[0] + "|" + $bifrost_shape) "/" -renameNode $io_node[0] $mesh_shape[0]`;
+    //string $input[] = `vnnCompound ($bifrost_graph[0] + "|" + $bifrost_shape) "/" -renameNode "input" $mesh_shape[0]`;
+    vnnNode ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $mesh_shape[0]) -createOutputPort "mesh" "Amino::Object" -portOptions ("pathinfo={path=" + $mesh_bifrost_path + "setOperation=+;active=true}");
+
+
+
+    string $mesh_to_volume[] = `vnnCompound ($bifrost_graph[0] + "|" + $bifrost_shape) "/" 
+                                -addNode "BifrostGraph,Geometry::Converters,mesh_to_volume"`;
+
+    
+    string $contour_cubes[] = `vnnCompound ($bifrost_graph[0] + "|" + $bifrost_shape) "/" 
+                                -addNode "BifrostGraph,Geometry::Converters,contour_dual_marching_cubes"`;
+
+
+    vnnNode ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $mesh_to_volume[0]) -setPortDefaultValues "volume_mode" "1"; // set mesh_to_volume to Shell mode
+    vnnNode ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $mesh_to_volume[0]) -setPortDefaultValues "detail_size" $detail_size; // set mesh_to_volume detail size
+    vnnNode ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $mesh_to_volume[0]) -setPortDefaultValues "fog_density" $fog_density; // set mesh_to_volume fog density
+    vnnNode ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $mesh_to_volume[0]) -setPortDefaultValues "offset" $offset; // set mesh_to_volume offset
+
+    string $output[] = `vnnCompound ($bifrost_graph[0] + "|" + $bifrost_shape) "/" -addIONode false`;
+    string $out_socket[] = `vnnNode ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $output[0]) -createInputPort "mesh" "Amino::Object"`; // empty return, not good
+    
+    vnnConnect ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $mesh_shape[0] + ".mesh") ("/" + $mesh_to_volume[0] + ".mesh"); // mesh to mesh_to_volume
+    vnnConnect ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $mesh_to_volume[0] + ".volume") ("/" + $contour_cubes[0] + ".volume"); // mesh_to_volume to contour_cubes
+    vnnConnect ($bifrost_graph[0] + "|" + $bifrost_shape) ("/" + $contour_cubes[0] + ".mesh") ("/" + $output[0] + ".mesh1"); // contour_cubes to output (final)
+    
+
+
+    string $mesh_buffer = `createNode "mesh" -ss`;
+    string $mesh_transform_buffer[] = `listRelatives -p $mesh_buffer`;
+    string $bifrost_to_geo = `createNode "bifrostGeoToMaya" -ss`;
+
+    //print("transform_buffer: " + $mesh_transform_buffer[0] + "\n");
+    //print("mesh_buffer: " + $mesh_buffer + "\n");
+    //print("bifrost_to_geo: " + $bifrost_to_geo + "\n");
+    
+    connectAttr -f ($bifrost_shape + ".mesh1") ($bifrost_to_geo + ".bifrostGeo");
+    connectAttr -f ($bifrost_to_geo + ".mayaMesh[0]") ($mesh_buffer + ".inMesh");
+
+    string $output_mesh[] = `duplicate -n ("C_" + $mesh) $mesh_transform_buffer[0]`;
+
+
+    delete $bifrost_to_geo;
+    delete $mesh_transform_buffer[0];
+    delete $bifrost_graph[0];
+    
+    catchQuiet(`parent -w $output_mesh[0]`);
+
+    // return bifrosted mesh
+    return $output_mesh[0];
+}

@@ -1,0 +1,203 @@
+/*
+    this file contain all MeshLab related functions to execute from Autodesk Maya
+*/
+
+
+eval ("source \"" + $IN_voxelProxy_utils + "\"");
+
+global proc int voxelProxy_mlx_edit(string $mlx, string $parameter, string $value) {
+    
+    string $tmp = ($mlx + ".tmp");
+    
+    int $fstream= `fopen $mlx "r"`;
+    int $fstream_tmp = `fopen $tmp "w"`;
+    
+    if (!$fstream) {
+        trace ("voxelProxy_mlx_edit -> Failed to open file at path: " + $mlx);
+        return 0;
+    }
+
+
+    string $line = `fgetline $fstream`;
+
+    while (size($line) > 0) {
+
+        if (`gmatch $line ("*name=\"" + $parameter + "\"*")`) {
+
+            string $pattern = "value=\"[^\"]*\"";
+            string $replacement = "value=\"" + $value + "\"";
+            $line = `substitute $pattern $line $replacement`;
+        }
+        
+        fprint $fstream_tmp $line;
+        $line = `fgetline $fstream`;
+    }
+
+
+
+    fclose $fstream;
+    fclose $fstream_tmp;
+
+    sysFile -delete $mlx;
+    sysFile -rename $mlx $tmp;
+
+    return 1;
+    
+}
+
+
+// prepare for MeshLabServer operations (creates temp folders and scripts to use)
+global proc int voxelProxy_MeshLabServer_prepare() {
+
+    global string $VAR_voxelProxyVAR_appdata;
+
+    string $temp = ($VAR_voxelProxyVAR_appdata + "/voxel_proxy/temp"); // temp folder exists only when meshlab job running
+    
+
+    if (!`filetest -d ($VAR_voxelProxyVAR_appdata + "/voxel_proxy")`) {
+        sysFile -md ($VAR_voxelProxyVAR_appdata + "/voxel_proxy");
+    }
+
+    if (!`filetest -d $temp`) {
+        sysFile -md $temp;
+    }
+
+
+    string $files[] = `getFileList -fld $temp -fs "*"`;
+
+    if (size($files) != 0) {
+
+        for ($f in $files) {
+
+            string $filepath = ($temp + "/" + $f);
+            sysFile -del $filepath;
+        }
+    }
+   
+    return 1;
+}
+
+
+
+// run meshlabserver.exe in console to process given mesh and import back to maya
+global proc int voxelProxy_MeshLabServer_start(string $meshlabserver, string $mesh) {
+    /*
+        @note: $mesh must be a contour mesh from bifrost
+    */
+    
+    if (!`objExists $mesh`) {
+        trace ("voxelProxy_MeshLabServer_start -> Failed to find mesh: " + $mesh);
+        return 0;
+    }
+
+    if (!`filetest -f $meshlabserver`) {
+        trace ("voxelProxy_MeshLabServer_start -> Failed to find MeshLabServer.exe at path: " + $meshlabserver);
+        return 0;
+    }
+
+    global string $VAR_voxelProxyVAR_appdata;
+    global string $VAR_voxelProxyVAR_folder;
+    string $temp = ($VAR_voxelProxyVAR_appdata + "/voxel_proxy/temp");
+
+
+    progressWindow -edit -status "Exporting contour mesh for MeshLab job..." -progress 45;
+    voxelProxy_MeshLabServer_prepare();
+    voxelProxy_exportOBJ($mesh, $temp); // export mesh to use in MeshLab
+
+
+    // setup paths for MeshLab job
+    string $input_mesh = ($temp + "/" + $mesh + ".obj");
+    string $output_mesh = (($temp + "/" + $mesh + "_ready.obj"));
+    string $script = ($VAR_voxelProxyVAR_folder + "/meshlab/scripts/remesh.mlx");
+
+
+    progressWindow -edit -status "Preparing MeshLab scripts..." -progress 55;
+    // now wee need to prepare $script
+    // first - copy it and edit parameter inside, this will be our temp script to delete later
+    string $temp_script = ($VAR_voxelProxyVAR_appdata + "/voxel_proxy/temp/remesh_temp.mlx");
+    sysFile -copy $temp_script $script;
+    
+    //now edit temp script (grab polycount from UI and write to script)
+    int $output_polycount = `intSliderGrp -q -v voxelProxy_meshLab_meshPolygons`;
+    voxelProxy_mlx_edit($temp_script, "TargetFaceNum", $output_polycount);
+
+
+    progressWindow -edit -status "Running MeshLabServer..." -progress 75;
+    // preapre MeshLabServer and run
+    string $cmd = ("start \"" + $meshlabserver + "\" " + " -i " + $input_mesh + " -o " + $output_mesh + " -s " + $temp_script);
+    system($cmd); // start MeshLab job
+    
+
+    progressWindow -edit -status "Waiting for MeshLab to finish..." -progress 60;
+
+    //pause -seconds 1; 
+    // if we dont pause the import function will fail wtff
+    // well its outside maya so its seems logical... maya have no idea about current MeshLab state
+    // what if system needed more than 1 second to write a obj file? 
+
+
+    // this will scan directory for MeshLab output for a while, because Maya have no idea about current MeshLab state
+    $start = `timerX`;
+    $end = `timerX -startTime $start`;
+
+    while ($end < 30) { // 30 actually a looong timer, maybe this will help with really slow PC 
+
+        $end = `timerX -startTime $start`;
+
+        if (`filetest -f $output_mesh`) {
+            catchQuiet(`sysFile -del $temp_script`);
+            break;
+        }
+
+        if ($end == 30) {
+
+            progressWindow -edit -progress 100;
+            progressWindow -endProgress;
+
+            //here we also need a error window that will tell that timer is over and importer couldnt find output mesh
+            framelessDialog -title "Voxel Proxy"
+                            -message "MeshLab time-out."
+                            -path "Your system was unable to write the file within 30 seconds or \n something unexpected happened.";
+
+            trace ("voxelProxy_MeshLabServer_start -> System failed to write file within 30 seconds or something went wrong.");
+            return 0;
+        }
+    }
+    
+    pause -sec 2; // just for.. i dont know. this little fella hold everything together
+
+
+    // import MeshLab mesh into maya scene
+    progressWindow -edit -status "Importing mesh from MeshLab..." -progress 70;
+    voxelProxy_importOBJ($output_mesh, ("proxy_" + $mesh));
+
+
+    // this syntax is something, i dont like run python from mel
+    // this will do a little post procces on meshlab mesh to delete all gargabe
+    int $singleShell = `checkBox -q -v voxelProxy_meshLab_singleShell`;
+
+    if ($singleShell) {
+
+        progressWindow -edit -status "Processing proxy mesh..." -progress 80;
+
+        python("import python.voxelproxy as voxelproxy");
+        string $output_proxy = python (("voxelproxy.mesh_process( \"" + ("proxy_" + $mesh) + "\" )")); // here wee need to pass mesh from MeshLab
+        
+
+        catchQuiet(voxelProxy_set_material($output_proxy));
+        catchQuiet(`rename $output_proxy ("proxy_" + $mesh)`);
+        catchQuiet(`sysFile -del $temp_script`);
+
+    } else {
+        progressWindow -edit -status "Getting things ready..." -progress 80; // after this the progress window will finish in file -> gui_ops.mel
+        
+        catchQuiet(voxelProxy_set_material(("proxy_" + $mesh)));
+        catchQuiet(`sysFile -del $temp_script`);
+
+    }
+    
+    
+    return 1;
+}
+
+

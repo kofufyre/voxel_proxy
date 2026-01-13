@@ -1,0 +1,207 @@
+// functions used to call from UI
+
+
+eval ("source \"" + $IN_voxelProxy_bifrost + "\"");
+eval ("source \"" + $IN_voxelProxy_meshlab + "\"");
+
+
+global proc int voxelProxy_create_btn() {
+    // TO-DO: Check contour mesh for bounding box, if its really smaller than original mesh then contour mash obviosly bad
+
+    string $MSelection[] = `ls -sl`;
+
+    if (size($MSelection) == 0) {
+        return 0;
+    }
+
+
+    int $keepContourMesh = `checkBox -q -v voxelProxy_keepContourMesh`;
+    int $skipMeshLab = `checkBox -q -v voxelProxy_meshLab_skip`;
+
+
+    float $bifrost_offset = `floatSliderGrp -q -v voxelProxy_bifrostOffset`;
+    float $bifrost_density = `floatSliderGrp -q -v voxelProxy_bifrostDensity`;
+    float $bifrost_detail = `floatSliderGrp -q -v voxelProxy_bifrostDetail`;
+    
+
+    progressWindow
+    -title "Hold on"
+    -progress 0
+    -status ("Creating contour mesh...")
+    -isInterruptable false;
+
+
+
+    for ($n in $MSelection) {
+
+        string $contour_mesh = voxelProxy_contour_mesh($n, $bifrost_offset, $bifrost_density, $bifrost_detail);
+        
+        if ($skipMeshLab) {
+            progressWindow -edit -progress 100;
+            progressWindow -endProgress;
+            continue; // if "Suppress" chekbox is enabled in UI then meshlab job will be skipped
+        }
+
+
+        // check for bad contour mesh:
+        python("import python.voxelproxy as voxelproxy");
+        //int $original_polycount = python (("voxelproxy.mesh_polycount( \"" + $n + "\" )")); 
+        int $contour_polycount = python (("voxelproxy.mesh_polycount( \"" + $contour_mesh + "\" )"));
+
+        //print("contour poly: " + $contour_polycount + "\n");
+        //print("original poly: " + $original_polycount + "\n");
+
+        progressWindow -edit -status "Checking quality of contour mesh..." -progress 10;
+
+        if ($contour_polycount == 0) {
+            // TO-DO: Check for bounding box, if its really smaller than original mesh than contour mash obviosly bad
+            delete $contour_mesh;
+            
+            progressWindow -edit -progress 100;
+            progressWindow -endProgress;
+
+            framelessDialog -title "Voxel Proxy"
+                            -message "Bad contour mesh. (bifrost)"
+                            -path "The contour mesh from bifrost has 0 polygons. Try another voxels settings in the UI. \n Tip: density must be never lower than detail";
+
+            trace "voxelProxy_create_btn -> Bad contour mesh.";
+            return 0;
+        }
+
+
+        progressWindow -edit -status "Getting MeshLabServer.exe" -progress 20;
+
+        // prepare for meshlab job and run it
+        string $meshlabserver = voxelProxy_meshLabServer_get_appdata();
+        
+        // .ini file is empty
+        if (size($meshlabserver) == 0) {
+
+            progressWindow -edit -progress 100;
+            progressWindow -endProgress;
+
+            voxelProxy_meshlab_draw();
+            framelessDialog -title "Voxel Proxy"
+                        -message "MeshLab missing."
+                        -path "Please, set the path to meshlabserver.exe in dependency window.";
+
+
+            trace "voxelProxy_create_btn -> MeshLabServer missing.";
+            return 0; 
+        }
+
+
+        // .ini file contain invalid path
+        if (!`filetest -f $meshlabserver`) {
+
+            progressWindow -edit -progress 100;
+            progressWindow -endProgress;
+
+            voxelProxy_meshlab_draw();
+            framelessDialog -title "Voxel Proxy"
+                        -message "MeshLab invalid path."
+                        -path "Please, set the path to meshlabserver.exe in dependency window.";
+
+
+            trace ("voxelProxy_create_btn -> Given path to MeshLabServer doesnt exist: " + $meshlabserver);
+            return 0; 
+        }
+
+        // .ini file lead to wrong executable file (must be meshlabserver.exe)
+        if (basename($meshlabserver, "") != "meshlabserver.exe") {
+            
+            progressWindow -edit -progress 100;
+            progressWindow -endProgress;
+
+            voxelProxy_meshlab_draw();
+            framelessDialog -title "Voxel Proxy"
+                        -message "MeshLab wrong executable file."
+                        -path "Specified path in dependency window must ends on -> meshlabserver.exe";
+
+
+            trace ("voxelProxy_create_btn -> Wrong executable file given as MeshLabServer: " + $meshlabserver);
+            return 0; 
+
+        }
+        
+
+        progressWindow -edit -status "Preparing MeshLab to run..." -progress 30;
+
+        // here we need to create MeshLabServer job and return mesh to maya
+        voxelProxy_MeshLabServer_start($meshlabserver,  $contour_mesh);
+
+
+        // delete bifrost mesh after remesh
+        if (!$keepContourMesh && !$skipMeshLab) {
+
+            if (`objExists $contour_mesh`) {
+                delete $contour_mesh;
+            }
+            
+        }
+    }
+    
+
+
+    progressWindow -edit -progress 100;
+    progressWindow -endProgress;
+
+    return 1;
+}
+
+
+// suppress MeshLab 
+global proc int voxelProxy_suppress_btn() {
+
+    if (!`window -q -ex voxelProxyUI`) {
+        return 0;
+    }
+
+    int $state = `checkBox -q -v voxelProxy_meshLab_skip`;
+
+    if ($state) {
+
+        intSliderGrp -e -vis off voxelProxy_meshLab_meshPolygons;
+        checkBox -e -vis off voxelProxy_meshLab_singleShell;
+        image -e -i "Mute_ON.png" voxelProxy_meshLab_muteIcon;
+
+        image -e -vis on voxelProxy_meshLab_suppressHintIcon;
+        text -e -vis on voxelProxy_meshLab_suppressHint;
+
+    } else {
+
+        intSliderGrp -e -vis on voxelProxy_meshLab_meshPolygons;
+        checkBox -e -vis on voxelProxy_meshLab_singleShell;
+        image -e -i "Mute_OFF.png" voxelProxy_meshLab_muteIcon;
+
+        image -e -vis off voxelProxy_meshLab_suppressHintIcon;
+        text -e -vis off voxelProxy_meshLab_suppressHint;
+    }
+
+
+    return 1;
+    
+}
+
+/*
+// this will hide all UI elements related to MeshLab
+global proc int voxelProxy_meshLab_hide(int $state) {
+
+    if (!`window -q -ex voxelProxyUI`) {
+        return 0;
+    }
+
+    if ($state) {
+
+
+    } else {
+
+    }
+
+
+
+
+
+}
+
+*/

@@ -1,0 +1,34 @@
+/*
+    Voxel Proxy setup file.
+*/
+
+
+global string $IN_voxelProxy_bifrost;
+global string $IN_voxelProxy_gui;
+global string $IN_voxelProxy_gui_ops;
+global string $IN_voxelProxy_meshlab;
+global string $IN_voxelProxy_utils;
+global string $IN_voxelProxy_main;
+
+global string $VAR_voxelProxy_documents;
+global string $VAR_voxelProxyVAR_appdata;
+global string $VAR_voxelProxyVAR_folder;
+
+// global paths:
+$VAR_voxelProxy_documents = `getenv "HOME"`; // get user path to documents folder
+$VAR_voxelProxyVAR_appdata = `getenv "APPDATA"`; // get user appdata folder
+$VAR_voxelProxyVAR_folder = ($VAR_voxelProxy_documents + "/maya/modules/voxel_proxy"); // voxel proxy folder
+
+
+// include paths:
+$IN_voxelProxy_bifrost = ($VAR_voxelProxyVAR_folder + "/src/bifrost.mel");
+$IN_voxelProxy_gui = ($VAR_voxelProxyVAR_folder + "/src/gui.mel");
+$IN_voxelProxy_gui_ops = ($VAR_voxelProxyVAR_folder + "/src/gui_ops.mel");
+$IN_voxelProxy_meshlab = ($VAR_voxelProxyVAR_folder + "/src/meshlab.mel");
+$IN_voxelProxy_utils = ($VAR_voxelProxyVAR_folder + "/src/utils.mel");
+$IN_voxelProxy_main = ($VAR_voxelProxyVAR_folder + "/voxel_proxy_main.mel");
+
+
+
+// init main function:
+eval ("source \"" + $IN_voxelProxy_main + "\"");

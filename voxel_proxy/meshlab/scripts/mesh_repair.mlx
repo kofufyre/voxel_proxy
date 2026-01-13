@@ -1,0 +1,9 @@
+<!DOCTYPE FilterScript>
+<FilterScript>
+ <filter name="Remove Duplicate Faces"/>
+ <filter name="Repair non Manifold Edges by removing faces"/>
+ <filter name="Repair non Manifold Vertices by splitting">
+  <Param tooltip="When a vertex is split it is moved along the average vector going from its position to the baricyenter of the FF connected faces sharing it" name="VertDispRatio" type="RichFloat" value="0" description="Vertex Displacement Ratio" isxmlparam="0"/>
+ </filter>
+ <filter name="Remove Duplicate Vertices"/>
+</FilterScript>

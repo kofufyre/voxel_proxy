@@ -1,0 +1,417 @@
+/*
+this file contain only UI related code
+
+main / about / dependency settings
+
+*/
+
+eval ("source \"" + $IN_voxelProxy_utils + "\"");
+eval ("source \"" + $IN_voxelProxy_gui_ops + "\"");
+
+global proc voxelProxy_github_open() {
+    launch -web "https://github.com/kofufyre/voxel_proxy";
+}
+
+// draw voxel proxy about ui
+global proc voxelProxy_about_draw() {
+
+    if (`window -q -ex voxelAbout_UI`) {
+        deleteUI voxelAbout_UI;
+    }
+
+    global string $VAR_voxelProxyVAR_folder;
+
+    string $window = `window -mxb off -s off -t "About" -wh 230 120  voxelAbout_UI`;
+    
+    formLayout main;
+
+    columnLayout -bgc 0.17 0.17 0.17 bg;
+    setParent main;
+
+    columnLayout -bgc 0.21 0.21 0.21 bg2;
+    setParent main;
+
+    columnLayout aboutIcon;
+        image -i ($VAR_voxelProxyVAR_folder + "/icons/voxel_proxy_shelf.png");
+    setParent main;
+
+    columnLayout aboutHeader;
+        text -l "< Voxel Proxy >" -fn "boldLabelFont";
+    setParent main;
+
+    
+    columnLayout aboutAuthor;
+        text -l "Author: Efigenio" -hl on;
+        text -l "Gmail: rignocchio@gmail.com" -hl on;
+    setParent main;
+
+
+    columnLayout aboutLine;
+        separator -st "out" -w 219;
+    setParent main;
+
+    rowLayout -nc 1 -cw1 64  aboutButtons;
+        button -l "Github" -w 60 -bgc 0.373 0.7 0.514 -c "voxelProxy_github_open();";
+        //button -l "Vimeo" -w 60 -bgc 0.082 0.604 0.78;
+    setParent main;
+
+
+    formLayout -e
+        -af aboutIcon "top" 5
+        -af aboutIcon "right" 10
+
+        -af aboutHeader "left" 67
+        -af aboutHeader "top" 5
+
+    
+        -af aboutAuthor "left" 15
+        -ac aboutAuthor "top" 5 aboutHeader
+
+        -af bg "top" 3
+        -af bg "bottom" 13
+        -af bg "left" 5
+        -af bg "right" 5 
+
+        -af bg2 "top" 5
+        -af bg2 "bottom" 15
+        -af bg2 "left" 7
+        -af bg2 "right" 7  
+
+        -af aboutButtons "bottom" 15
+        -af aboutButtons "left" 83
+
+
+        -af aboutLine "bottom" 6
+        -af aboutLine "left" 5
+    main;
+
+
+    showWindow $window;
+
+}
+
+voxelProxy_about_draw();
+
+// draw meshlab dependency ui
+global proc voxelProxy_meshlab_draw() {
+
+    if (`window -q -ex voxelMeshLab_UI`) {
+        deleteUI voxelMeshLab_UI;
+    }
+
+    global string $VAR_voxelProxyVAR_folder;
+    
+    string $window = `window -mxb off -s off 
+                            -t "MeshLab" -wh 230 240 
+                            -cc "voxelProxy_meshLabServer_save();"
+                            -p voxelProxyUI
+                            voxelMeshLab_UI`;
+   
+
+    formLayout main;
+
+    columnLayout dependText;
+        text -l "Voxel Proxy Dependency";
+    setParent main;
+
+    columnLayout -bgc 0.17 0.17 0.17 bg;
+    setParent main;
+
+    columnLayout -bgc 0.21 0.21 0.21 bg2;
+    setParent main;
+
+    columnLayout hintText;
+        text -ww 1 -l "Please, set the path to meshlabserver.exe file.";
+    setParent main;
+
+    rowLayout -nc 2 -cw 55 30 pathLayout;
+        textField -w 190 meshLabServerPath_field;
+        iconTextButton -i "fileOpen.png" -c "voxelProxy_textField_setPath();";
+    setParent main;
+
+
+    columnLayout pathHintText;
+        text -ww 1 -l "Make sure the path contain only / slashes    AND ends on <file.exe>";
+    setParent main;
+
+    formLayout saveLayout;
+        button  -l "Save" -w 65 -h 33 -bgc 0.478 0.678 0.451 -c "voxelProxy_meshLabServer_save();";
+    setParent main;
+
+    formLayout -e
+
+        -af dependText "left" 49
+        -af dependText "top" 2
+
+        -af bg "top" 20
+        -af bg "bottom" 140
+        -af bg "left" 5
+        -af bg "right" 5 
+
+        -af bg2 "top" 22
+        -af bg2 "bottom" 142
+        -af bg2 "left" 7
+        -af bg2 "right" 7
+
+        -ac hintText "top" 5 bg2
+        -af hintText "left" 52
+
+        -ac pathLayout "top" 5 hintText
+        -af pathLayout "left" 5
+
+        -ac pathHintText "top" 3 pathLayout
+        -af pathHintText "left" 6 
+
+        -ac saveLayout "top" 7 pathHintText
+        -af saveLayout "left" 80
+    main;
+
+   
+
+    columnLayout logo;
+        image -i ($VAR_voxelProxyVAR_folder + "/logo/meshlab.png");
+    setParent main;
+
+    formLayout -e
+        -af logo "top" 8
+        -af logo "left" 3
+    main;
+
+
+    showWindow $window;
+
+    
+    // write server path to textifeld if path defined
+    if (voxelProxy_settingsFile_exists()) {
+        string $server = voxelProxy_meshLabServer_get_appdata();
+        textField -e -tx $server meshLabServerPath_field;
+    }
+}
+
+
+
+// draw main voxel proxy ui
+global proc voxelProxyUI_draw() {
+    
+    if (`window -q -ex voxelProxyUI`) {
+        deleteUI voxelProxyUI;
+    }
+
+    global string $VAR_voxelProxyVAR_folder;
+
+
+    string $window = `window -mxb off -s off -t "Voxel Proxy" -wh 230 350 voxelProxyUI`;
+   
+
+    
+    formLayout main;
+    
+    // Settings:
+    
+    // MAIN WINDOW THINGS
+    columnLayout -bgc 0.17 0.17 0.17 bg;
+    setParent main;
+
+    columnLayout -bgc 0.21 0.21 0.21 bg2;
+    setParent main;
+
+    formLayout -e
+        -af bg "top" 20
+        -af bg "bottom" 250
+        -af bg "left" 5
+        -af bg "right" 5 
+
+        -af bg2 "top" 22
+        -af bg2 "bottom" 252
+        -af bg2 "left" 7
+        -af bg2 "right" 7
+    main;
+
+   
+
+    columnLayout logo;
+        image -i ($VAR_voxelProxyVAR_folder + "/logo/voxel_proxy_header.png");
+    setParent main;
+   
+
+    formLayout -e
+        -af logo "top" 6
+        -af logo "left" 7
+    main;
+
+
+    menuBarLayout -w 90 -hlc 0.325 0.58 0.78;
+
+        menu -l "Help" -helpMenu true;
+            menuItem -l "MeshLabServer" -c "voxelProxy_meshlab_draw();";
+            menuItem -l "About..." -c "voxelProxy_about_draw();";
+    setParent main;
+
+
+    // OPERATIONS
+    columnLayout -bgc 0.17 0.17 0.17 bfrost_settings_bg;
+    setParent main;
+
+    columnLayout -bgc 0.21 0.21 0.21 bfrost_settings;
+    setParent main;
+
+    columnLayout bfrost_header;
+        text -l "< Voxels >" -fn "boldLabelFont";
+    setParent main;
+
+    columnLayout optionsLayout;
+        floatSliderGrp -hlc 0.325 0.58 0.78 -w 300 -l "offset" -f on -v 1 -ss 0.01 -min 0 -max 2 voxelProxy_bifrostOffset;
+        separator -h 3;
+        floatSliderGrp -hlc 0.325 0.58 0.78 -w 300 -l "density" -f on -v 1 -ss 0.01 -min 0.005 -max 1 voxelProxy_bifrostDensity;
+        separator -h 3;
+        floatSliderGrp -hlc 0.325 0.58 0.78 -w 300 -l "detail" -f on -v 0.05 -ss 0.001 -min 0.003 -max 1 voxelProxy_bifrostDetail;
+    setParent main;
+    
+    columnLayout bfrostOptionLayout;
+        checkBox -hlc 0.325 0.58 0.78 -l "Keep contour mesh" -ann "Will keep bifrost converted mesh in scene" voxelProxy_keepContourMesh;
+    setParent main;
+
+
+    // meshlab ops:
+    columnLayout -bgc 0.17 0.17 0.17 mlab_settings_bg;
+    setParent main;
+
+    columnLayout -bgc 0.21 0.21 0.21 mlab_settings;
+    setParent main;
+
+    columnLayout mlab_header;
+        text -l "< Proxy Mesh >" -fn "boldLabelFont";
+    setParent main;
+
+    columnLayout -w 96 -h 18 -bgc 0.17 0.17 0.17 mlab_supressBG2;
+        separator -w 94 -st "out";
+    setParent main;
+
+    columnLayout -w 94 -h 16 -bgc 0.21 0.21 0.21 mlab_supressBG;
+    setParent main;
+
+    columnLayout mlab_supress_icon;
+        image -i "Mute_OFF.png" voxelProxy_meshLab_muteIcon;
+    setParent main;
+
+    columnLayout mlab_supress_check;
+        checkBox -l "Suppress" -cc "voxelProxy_suppress_btn();" voxelProxy_meshLab_skip;
+    setParent main;
+
+    columnLayout mlab_optionsLayout;
+        intSliderGrp -ann "How many polygons will be in proxy mesh" 
+                        -hlc 0.325 0.58 0.78 -w 300 -
+                        l "faces" -f on -v 5000 -ss 1 -min 1000 -max 20000
+                        voxelProxy_meshLab_meshPolygons;
+    setParent main;
+
+    
+    columnLayout mlab_mesh_singleShell;
+        checkBox -ann "Removes all mesh shells except the biggest one (by polygon count)" -l "Single Shell" -v 1 voxelProxy_meshLab_singleShell;
+    setParent main;
+
+
+    columnLayout mlab_suppress_textHint;
+        text -vis off -l "You suppressed MeshLab execution. \n Remesh will be skipped." voxelProxy_meshLab_suppressHint;
+    setParent main;
+    
+    columnLayout mlab_suppress_textHintIcon;
+        image -vis off -i "warningIcon.svg" voxelProxy_meshLab_suppressHintIcon;
+    setParent main;
+
+
+    columnLayout mlab_missing_textHint;
+        text -vis off -l "  MeshLabServer.exe is missing. \n  Go to: Help -> MeshLabServer" voxelProxy_meshLab_missingHint;
+    setParent main;
+    
+    columnLayout mlab_missing_textHintIcon;
+        image -vis off -i "warningIcon.svg" voxelProxy_meshLab_missingHintIcon;
+    setParent main;
+
+
+    formLayout -e
+        -af bfrost_settings_bg "top" 113
+        -af bfrost_settings_bg "bottom" 125 // bottom line of <Voxels> box 
+        -af bfrost_settings_bg "left" 8
+        -af bfrost_settings_bg "right" 14
+
+        -af bfrost_settings "top" 115
+        -af bfrost_settings "bottom" 124 // bottom line of <Voxels> box
+        -af bfrost_settings "left" 10
+        -af bfrost_settings "right" 10
+        
+        
+        -ac bfrost_header "bottom" -7 bfrost_settings
+        -af bfrost_header "left" 15
+
+        -ac optionsLayout "top" 5 bfrost_header
+        -af optionsLayout "left" -90
+
+        -ac bfrostOptionLayout "top" -2 optionsLayout
+        -af bfrostOptionLayout "left" 20
+
+        -ac mlab_header "top" 6 bfrost_settings
+        -af mlab_header "left" 15
+
+        -ac mlab_supressBG2 "top" 3 bfrost_settings
+        -af mlab_supressBG2 "right" 17
+
+        -ac mlab_supressBG "top" 5 bfrost_settings
+        -af mlab_supressBG "right" 17
+
+        
+        -ac mlab_supress_icon "top" 4 bfrost_settings
+        -af mlab_supress_icon "right" 93
+
+        -ac mlab_supress_check "top" 4 bfrost_settings
+        -af mlab_supress_check "right" 20
+
+        -ac mlab_suppress_textHint "top" 28 bfrost_settings
+        -af mlab_suppress_textHint "left" 21
+
+        -ac mlab_suppress_textHintIcon "top" 2 mlab_suppress_textHint
+        -af mlab_suppress_textHintIcon "left" 102
+
+
+        -ac mlab_missing_textHint "top" 28 bfrost_settings
+        -af mlab_missing_textHint "left" 30
+
+        -ac mlab_missing_textHintIcon "top" 2 mlab_missing_textHint
+        -af mlab_missing_textHintIcon "left" 102
+
+
+        -ac mlab_settings_bg "top" 12 bfrost_settings // top line of <Proxy Mesh> box (relative to Voxels box)
+        -af mlab_settings_bg "bottom" 45 // bottom line of <Proxy Mesh> box
+        -af mlab_settings_bg "left" 8
+        -af mlab_settings_bg "right" 14
+
+        -ac mlab_settings "top" 14 bfrost_settings
+        -af mlab_settings "bottom" 44 // bottom line of <Proxy Mesh> box
+        -af mlab_settings "left" 10
+        -af mlab_settings "right" 10
+
+        -ac mlab_optionsLayout "top" 10 mlab_header
+        -af mlab_optionsLayout "left" -90
+        
+        -ac mlab_mesh_singleShell "top" 2 mlab_optionsLayout
+        -af mlab_mesh_singleShell "left" 20
+    main;
+
+    
+    columnLayout -bgc 0.1 0.1 0.1 createLayout;
+        button -w 90 -h 35 -bgc 0.325 0.58 0.78 -ann "Create proxy meshes for selected meshes in scene" 
+                                                -l "Create" 
+                                                -c "voxelProxy_create_btn();" 
+                                                voxelProxy_createBtn;
+    setParent main;
+
+ 
+    formLayout -e
+        -af createLayout "left" 67
+        -af createLayout "bottom" 3
+    main;
+
+    showWindow $window;
+
+}
+

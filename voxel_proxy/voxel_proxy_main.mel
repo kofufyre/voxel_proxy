@@ -1,0 +1,53 @@
+// voxel proxy entry point
+
+
+eval ("source \"" + $IN_voxelProxy_gui + "\"");
+eval ("source \"" + $IN_voxelProxy_utils + "\"");
+
+
+global proc voxel_proxy() {
+
+    global string $VAR_voxelProxyVAR_appdata;
+
+    // just initialize some folder and files; its creates somewhere in project automatically but anyway.
+    if (!`filetest -d ($VAR_voxelProxyVAR_appdata + "/voxel_proxy")`) {
+        sysFile -md ($VAR_voxelProxyVAR_appdata + "/voxel_proxy");
+    }
+
+    if (!`filetest -f ($VAR_voxelProxyVAR_appdata + "/voxel_proxy/meshlabserver.ini")`) {
+        
+        int $fstream = `fopen ($VAR_voxelProxyVAR_appdata + "/voxel_proxy/meshlabserver.ini") "w"`;
+        fclose $fstream;
+    }
+
+    if (!`filetest -d ($VAR_voxelProxyVAR_appdata + "/voxel_proxy/temp")`) {
+        sysFile -md ($VAR_voxelProxyVAR_appdata + "/voxel_proxy/temp");
+    }
+
+
+    voxelProxyUI_draw();
+
+
+    string $meshlabserver = voxelProxy_meshLabServer_get_appdata();
+
+    if (size($meshlabserver) == 0 || basename($meshlabserver, "") != "meshlabserver.exe") {
+
+        voxelProxy_meshlab_draw();
+
+        text -e -vis on voxelProxy_meshLab_missingHint;
+        image -e -vis on voxelProxy_meshLab_missingHintIcon;
+
+        intSliderGrp -e -vis off voxelProxy_meshLab_meshPolygons;
+        checkBox -e -vis off voxelProxy_meshLab_singleShell;
+        image -e -vis off voxelProxy_meshLab_muteIcon;
+
+        image -e -vis off voxelProxy_meshLab_suppressHintIcon;
+        text -e -vis off voxelProxy_meshLab_suppressHint;
+
+        columnLayout -e -vis off mlab_supressBG;
+        columnLayout -e -vis off mlab_supressBG2;
+
+        checkBox -e -vis off voxelProxy_meshLab_skip;
+        
+    }   
+}
