@@ -90,7 +90,7 @@ global proc voxelProxy_about_draw() {
 
 }
 
-voxelProxy_about_draw();
+
 
 // draw meshlab dependency ui
 global proc voxelProxy_meshlab_draw() {
