@@ -48,7 +48,7 @@ https://github.com/user-attachments/assets/e7829120-70eb-4852-811e-5f1f217e8722
 
 ### Parameters: 
 * `offset` <br>
-  - World-space offsety to voxels. Will work like extrude by normal.
+  - World-space offset to voxels. Will work like extrude by normal.
     
 * `density` <br>
   - A multiplier to apply to voxels detail.
