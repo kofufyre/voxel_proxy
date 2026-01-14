@@ -1,5 +1,5 @@
 <img width="1192" height="364" alt="voxel_proxy_header" src="https://github.com/user-attachments/assets/2a9912b3-419a-4aa2-af91-9baab7291a7b" /> <br>
-
+*Currently in development.
 # Description
 
 **Voxel Proxy** provides a simple and fast way to generate volume proxy meshes. Originally intended as a rigging tool to generate a proxy mesh for skinning purpose to represent a complex geometry as one solid shape.
