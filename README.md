@@ -80,9 +80,3 @@ To help me troubleshoot any issue that was suddenly discovered by you please pro
 * Because of using **MeshLab** via console command, **Maya** is completely **unaware** of the current **MeshLab state**. Did it finish? Maybe failed? <br>
   For more details and logic behind this you can read the file named: __`meshlab.mel`__
 
-
-
-
-# Contact me
-GMail: <rignocchio@gmail.com> <br>
-Telegram: @kofufyre
